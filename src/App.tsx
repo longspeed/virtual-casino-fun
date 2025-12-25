@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Slots from "./pages/Slots";
 import Dice from "./pages/Dice";
 import Roulette from "./pages/Roulette";
+import Blackjack from "./pages/Blackjack";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/slots" element={<Slots />} />
             <Route path="/dice" element={<Dice />} />
             <Route path="/roulette" element={<Roulette />} />
+            <Route path="/blackjack" element={<Blackjack />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

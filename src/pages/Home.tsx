@@ -22,6 +22,12 @@ const games = [
     description: 'European single-zero wheel',
     path: '/roulette',
   },
+  {
+    id: 'blackjack',
+    name: 'Blackjack',
+    description: 'Beat the dealer to 21',
+    path: '/blackjack',
+  },
 ];
 
 export default function Home() {
