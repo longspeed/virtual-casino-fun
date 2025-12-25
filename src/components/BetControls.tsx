@@ -13,7 +13,7 @@ export function BetControls({
   bet,
   onBetChange,
   minBet = 10,
-  maxBet = 10000,
+  maxBet = 10000999,
   disabled = false,
 }: BetControlsProps) {
   const presets = [50, 100, 500, 1000];

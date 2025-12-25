@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useCasino } from '@/context/CasinoContext';
 import { Button } from '@/components/ui/button';
 import { Settings, LogOut } from 'lucide-react';
+import { StreakDisplay } from './StreakDisplay';
+import { DailyBonus } from './DailyBonus';
 
 interface LayoutProps {
   children: ReactNode;
@@ -17,6 +19,7 @@ export function Layout({ children }: LayoutProps) {
     { path: '/dice', label: 'Dice' },
     { path: '/roulette', label: 'Roulette' },
     { path: '/blackjack', label: 'Blackjack' },
+    { path: '/leaderboard', label: 'Leaderboard' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -56,8 +59,10 @@ export function Layout({ children }: LayoutProps) {
             {/* User Info */}
             {state.user && (
               <div className="flex items-center gap-3">
+                <StreakDisplay />
+                
                 {/* Balance */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary border border-border">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary border border-border animate-count-up">
                   <span className="mono text-sm font-bold text-primary">
                     {state.user.balance.toLocaleString()}
                   </span>
@@ -120,7 +125,7 @@ export function Layout({ children }: LayoutProps) {
       <footer className="border-t border-border py-4">
         <div className="container mx-auto px-4 text-center">
           <p className="text-xs text-muted-foreground">
-            Simulation only — No real money involved
+            Test Casino
           </p>
         </div>
       </footer>
