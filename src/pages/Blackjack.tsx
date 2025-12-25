@@ -229,8 +229,7 @@ export default function Blackjack() {
     }, delay);
     
     // Log the game
-    const totalBetAmount = finalGame.playerHands.reduce((sum, h) => sum + h.bet, 0);
-    const netWin = totalPayout - totalBetAmount;
+
     logGame({
       game: 'blackjack' as any,
       bet: totalBetAmount,
