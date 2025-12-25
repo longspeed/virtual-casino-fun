@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCasino } from '@/context/CasinoContext';
 import { Layout } from '@/components/Layout';
 import { BetControls } from '@/components/BetControls';
@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { spinSlots, calculateSlotWin, SLOT_SYMBOLS, SLOT_PAYTABLE, SlotSymbol } from '@/lib/gameLogic';
 import { rng } from '@/lib/rng';
 import { cn } from '@/lib/utils';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Flame } from 'lucide-react';
 import { toast } from 'sonner';
+import { audioManager } from '@/lib/audio';
 
 export default function Slots() {
-  const { state, placeBet, addWinnings, logGame } = useCasino();
+  const { state, placeBet, addWinnings, logGame, updateStreak } = useCasino();
   const [bet, setBet] = useState(100);
   const [reels, setReels] = useState<SlotSymbol[]>(['🍒', '🍒', '🍒']);
   const [spinning, setSpinning] = useState(false);
@@ -20,6 +21,8 @@ export default function Slots() {
 
   const maxBet = state.user?.balance || 1000;
   const rtp = state.settings.slotRTP;
+  const winStreak = state.streaks.currentWinStreak;
+  const isNearMiss = result && !result.won && reels.filter((s, i, arr) => arr.filter(x => x === s).length >= 2).length > 0;
 
   const spin = async () => {
     if (!state.user) return;
@@ -51,12 +54,27 @@ export default function Slots() {
         
         setReels(finalReels);
         setSpinning(false);
-        setResult({ won: win > 0, amount: win, multiplier });
+        
+        // Variable payout delay: longer for wins (build anticipation), faster for losses
+        const delay = win > 0 ? 300 : 100;
+        
+        setTimeout(() => {
+          setResult({ won: win > 0, amount: win, multiplier });
 
-        if (win > 0) {
-          addWinnings(win);
-          toast.success(`Won ${win.toLocaleString()} credits`);
-        }
+          if (win > 0) {
+            addWinnings(win);
+            audioManager.playWinSound(win, bet);
+            toast.success(`Won ${win.toLocaleString()} credits`);
+          } else {
+            audioManager.playLossSound();
+          }
+          
+          // Check for near-miss
+          const hasNearMiss = finalReels.filter((s, i, arr) => arr.filter(x => x === s).length >= 2).length > 0;
+          if (hasNearMiss && win === 0) {
+            toast.info('So close! Try again!', { duration: 2000 });
+          }
+        }, delay);
 
         logGame({
           game: 'slots',
@@ -66,6 +84,9 @@ export default function Slots() {
           balanceAfter: state.user!.balance + win - bet,
           seed: rng.getSeed(),
         });
+        
+        // Update streak
+        updateStreak(win > 0);
       }
     }, spinInterval);
   };
@@ -75,7 +96,15 @@ export default function Slots() {
       <div className="max-w-md mx-auto space-y-4">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-xl font-semibold">Slots</h1>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-xl font-semibold">Slots</h1>
+            {winStreak >= 3 && (
+              <div className="flex items-center gap-1 text-primary animate-pulse-glow">
+                <Flame className="h-4 w-4" />
+                <span className="text-xs font-bold">{winStreak}</span>
+              </div>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             RTP: {(rtp * 100).toFixed(1)}%
           </p>
@@ -90,9 +119,10 @@ export default function Slots() {
                 <div
                   key={i}
                   className={cn(
-                    "w-16 h-20 flex items-center justify-center rounded-md bg-background border border-border text-4xl",
-                    spinning && "opacity-70",
-                    result?.won && "border-primary"
+                    "w-16 h-20 flex items-center justify-center rounded-md bg-background border text-4xl transition-all duration-300",
+                    spinning && "opacity-70 animate-reel-spin",
+                    result?.won && "border-primary animate-pulse-glow premium-glow",
+                    isNearMiss && !result?.won && "border-primary/50 near-miss"
                   )}
                 >
                   <span className={cn(spinning && "animate-number")}>
@@ -122,9 +152,12 @@ export default function Slots() {
 
           {/* Spin Button */}
           <Button
-            className="w-full"
+            className="w-full interactive-button"
             size="xl"
-            onClick={spin}
+            onClick={() => {
+              audioManager.playClickSound();
+              spin();
+            }}
             disabled={spinning || bet > (state.user?.balance || 0)}
           >
             {spinning ? 'Spinning...' : 'Spin'}

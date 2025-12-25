@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { spinRoulette, RouletteBet, RouletteBetType, ROULETTE_PAYOUTS, getRouletteRTP, RouletteColor } from '@/lib/gameLogic';
 import { rng } from '@/lib/rng';
 import { cn } from '@/lib/utils';
-import { X } from 'lucide-react';
+import { X, Flame } from 'lucide-react';
 import { toast } from 'sonner';
+import { audioManager } from '@/lib/audio';
 
 const BETTING_OPTIONS: { type: RouletteBetType; label: string }[] = [
   { type: 'red', label: 'Red' },
@@ -30,7 +31,7 @@ const ROULETTE_NUMBERS: { num: number; color: RouletteColor }[] = [
 ];
 
 export default function Roulette() {
-  const { state, placeBet: deductBet, addWinnings, logGame } = useCasino();
+  const { state, placeBet: deductBet, addWinnings, logGame, updateStreak } = useCasino();
   const [betAmount, setBetAmount] = useState(100);
   const [bets, setBets] = useState<RouletteBet[]>([]);
   const [spinning, setSpinning] = useState(false);
@@ -40,6 +41,7 @@ export default function Roulette() {
   const maxBet = state.user?.balance || 1000;
   const totalBet = bets.reduce((sum, bet) => sum + bet.amount, 0);
   const rtp = getRouletteRTP();
+  const winStreak = state.streaks.currentWinStreak;
 
   const addBet = (type: RouletteBetType, number?: number) => {
     if (betAmount > (state.user?.balance || 0) - totalBet) {
@@ -88,12 +90,21 @@ export default function Roulette() {
         color: result.pocket.color,
       });
       setSpinning(false);
-      setWinAmount(result.totalWin);
+      
+      // Variable payout delay: longer for wins, faster for losses
+      const delay = result.totalWin > 0 ? 500 : 200;
+      
+      setTimeout(() => {
+        setWinAmount(result.totalWin);
 
-      if (result.totalWin > 0) {
-        addWinnings(result.totalWin);
-        toast.success(`Won ${result.totalWin.toLocaleString()} credits`);
-      }
+        if (result.totalWin > 0) {
+          addWinnings(result.totalWin);
+          audioManager.playWinSound(result.totalWin, totalBet);
+          toast.success(`Won ${result.totalWin.toLocaleString()} credits`);
+        } else {
+          audioManager.playLossSound();
+        }
+      }, delay);
 
       logGame({
         game: 'roulette',
@@ -103,6 +114,9 @@ export default function Roulette() {
         balanceAfter: state.user!.balance + result.totalWin - totalBet,
         seed: rng.getSeed(),
       });
+      
+      // Update streak
+      updateStreak(result.totalWin > 0);
 
       setBets([]);
     }, 1500);
@@ -113,7 +127,15 @@ export default function Roulette() {
       <div className="max-w-3xl mx-auto space-y-4">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-xl font-semibold">Roulette</h1>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-xl font-semibold">Roulette</h1>
+            {winStreak >= 3 && (
+              <div className="flex items-center gap-1 text-primary animate-pulse-glow">
+                <Flame className="h-4 w-4" />
+                <span className="text-xs font-bold">{winStreak}</span>
+              </div>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             European wheel • RTP: {(rtp * 100).toFixed(1)}%
           </p>
@@ -266,9 +288,12 @@ export default function Roulette() {
 
             {/* Spin Button */}
             <Button
-              className="w-full"
+              className="w-full interactive-button"
               size="lg"
-              onClick={spin}
+              onClick={() => {
+                audioManager.playClickSound();
+                spin();
+              }}
               disabled={spinning || bets.length === 0}
             >
               {spinning ? 'Spinning...' : 'Spin'}

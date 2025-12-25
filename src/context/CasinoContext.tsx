@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { rng } from '@/lib/rng';
+import { AchievementProgress, checkAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 
 // =============================================================================
 // TYPES
@@ -31,11 +32,35 @@ export interface CasinoSettings {
   rngSeed: number | null;
 }
 
+export interface StreakData {
+  currentWinStreak: number;
+  currentLossStreak: number;
+  longestWinStreak: number;
+  longestLossStreak: number;
+}
+
+export interface DailyBonus {
+  lastClaimDate: string | null;
+  consecutiveDays: number;
+  nextBonusAmount: number;
+}
+
 interface CasinoState {
   user: User | null;
   settings: CasinoSettings;
   gameLogs: GameLog[];
   isAdmin: boolean;
+  streaks: StreakData;
+  achievements: AchievementProgress[];
+  dailyBonus: DailyBonus;
+  stats: {
+    totalGames: number;
+    totalWins: number;
+    biggestWin: number;
+    biggestBet: number;
+    gameWins: Record<string, number>;
+    specialEvents: Record<string, number>;
+  };
 }
 
 type CasinoAction =
@@ -47,7 +72,11 @@ type CasinoAction =
   | { type: 'UPDATE_SETTINGS'; payload: Partial<CasinoSettings> }
   | { type: 'RESET_BALANCE' }
   | { type: 'CLEAR_LOGS' }
-  | { type: 'TOGGLE_ADMIN' };
+  | { type: 'TOGGLE_ADMIN' }
+  | { type: 'UPDATE_STREAK'; payload: { won: boolean } }
+  | { type: 'UPDATE_ACHIEVEMENTS'; payload: AchievementProgress[] }
+  | { type: 'CLAIM_DAILY_BONUS'; payload: number }
+  | { type: 'UPDATE_STATS'; payload: Partial<CasinoState['stats']> };
 
 // =============================================================================
 // INITIAL STATE
@@ -55,8 +84,8 @@ type CasinoAction =
 
 const DEFAULT_SETTINGS: CasinoSettings = {
   defaultBalance: 10000,
-  slotRTP: 0.96, // 96% RTP
-  diceHouseEdge: 0.02, // 2% house edge
+  slotRTP: 0.93, // 93% RTP (7% house edge)
+  diceHouseEdge: 0.04, // 4% house edge
   rngSeed: null, // null = use random seed
 };
 
@@ -82,6 +111,26 @@ const loadState = (): CasinoState => {
     settings: DEFAULT_SETTINGS,
     gameLogs: [],
     isAdmin: false,
+    streaks: {
+      currentWinStreak: 0,
+      currentLossStreak: 0,
+      longestWinStreak: 0,
+      longestLossStreak: 0,
+    },
+    achievements: [],
+    dailyBonus: {
+      lastClaimDate: null,
+      consecutiveDays: 0,
+      nextBonusAmount: 100,
+    },
+    stats: {
+      totalGames: 0,
+      totalWins: 0,
+      biggestWin: 0,
+      biggestBet: 0,
+      gameWins: {},
+      specialEvents: {},
+    },
   };
 };
 
@@ -174,6 +223,54 @@ function casinoReducer(state: CasinoState, action: CasinoAction): CasinoState {
       newState = { ...state, isAdmin: !state.isAdmin };
       break;
 
+    case 'UPDATE_STREAK':
+      const { won } = action.payload;
+      const newStreaks = { ...state.streaks };
+      if (won) {
+        newStreaks.currentWinStreak += 1;
+        newStreaks.currentLossStreak = 0;
+        newStreaks.longestWinStreak = Math.max(newStreaks.longestWinStreak, newStreaks.currentWinStreak);
+      } else {
+        newStreaks.currentLossStreak += 1;
+        newStreaks.currentWinStreak = 0;
+        newStreaks.longestLossStreak = Math.max(newStreaks.longestLossStreak, newStreaks.currentLossStreak);
+      }
+      newState = { ...state, streaks: newStreaks };
+      break;
+
+    case 'UPDATE_ACHIEVEMENTS':
+      newState = { ...state, achievements: action.payload };
+      break;
+
+    case 'CLAIM_DAILY_BONUS':
+      const today = new Date().toDateString();
+      const lastClaim = state.dailyBonus.lastClaimDate;
+      const isConsecutive = lastClaim === today || (lastClaim && new Date(lastClaim).toDateString() === new Date(Date.now() - 86400000).toDateString());
+      
+      const newConsecutiveDays = isConsecutive ? state.dailyBonus.consecutiveDays + 1 : 1;
+      const bonusAmount = 100 + (newConsecutiveDays - 1) * 50; // Increasing bonus
+      
+      newState = {
+        ...state,
+        dailyBonus: {
+          lastClaimDate: today,
+          consecutiveDays: newConsecutiveDays,
+          nextBonusAmount: 100 + newConsecutiveDays * 50,
+        },
+      };
+      
+      if (state.user) {
+        newState.user = { ...state.user, balance: state.user.balance + bonusAmount };
+      }
+      break;
+
+    case 'UPDATE_STATS':
+      newState = {
+        ...state,
+        stats: { ...state.stats, ...action.payload },
+      };
+      break;
+
     default:
       return state;
   }
@@ -202,6 +299,9 @@ interface CasinoContextType {
   placeBet: (amount: number) => boolean;
   addWinnings: (amount: number) => void;
   logGame: (log: Omit<GameLog, 'id' | 'timestamp' | 'userId'>) => void;
+  updateStreak: (won: boolean) => void;
+  claimDailyBonus: () => void;
+  checkAndUpdateAchievements: () => void;
 }
 
 const CasinoContext = createContext<CasinoContextType | null>(null);
@@ -242,7 +342,61 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
       type: 'ADD_GAME_LOG',
       payload: { ...log, userId: state.user.id },
     });
+    
+    // Update stats
+    const isWin = log.win > 0;
+    dispatch({
+      type: 'UPDATE_STATS',
+      payload: {
+        totalGames: state.stats.totalGames + 1,
+        totalWins: state.stats.totalWins + (isWin ? 1 : 0),
+        biggestWin: Math.max(state.stats.biggestWin, log.win),
+        biggestBet: Math.max(state.stats.biggestBet, log.bet),
+        gameWins: {
+          ...state.stats.gameWins,
+          [log.game]: (state.stats.gameWins[log.game] || 0) + (isWin ? 1 : 0),
+        },
+      },
+    });
+    
+    // Update streak
+    updateStreak(isWin);
   };
+
+  const updateStreak = (won: boolean) => {
+    dispatch({ type: 'UPDATE_STREAK', payload: { won } });
+  };
+
+  const claimDailyBonus = () => {
+    dispatch({ type: 'CLAIM_DAILY_BONUS', payload: 0 });
+  };
+
+  const checkAndUpdateAchievements = () => {
+    if (!state.user) return;
+    
+    const stats = {
+      totalWins: state.stats.totalWins,
+      totalGames: state.stats.totalGames,
+      currentBalance: state.user.balance,
+      currentStreak: state.streaks.currentWinStreak,
+      biggestWin: state.stats.biggestWin,
+      biggestBet: state.stats.biggestBet,
+      gameWins: state.stats.gameWins,
+      specialEvents: state.stats.specialEvents,
+    };
+    
+    const updated = checkAchievements(state.achievements, stats);
+    const newlyUnlocked = updated.filter(
+      (a, i) => a.unlocked && (!state.achievements[i] || !state.achievements[i].unlocked)
+    );
+    
+    dispatch({ type: 'UPDATE_ACHIEVEMENTS', payload: updated });
+    
+    // Return newly unlocked achievements for notification
+    return newlyUnlocked.map(a => ACHIEVEMENTS.find(ach => ach.id === a.achievementId)).filter(Boolean);
+  };
+
+  // Note: Achievement checking should be called manually after game results
 
   return (
     <CasinoContext.Provider
@@ -255,6 +409,9 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
         placeBet,
         addWinnings,
         logGame,
+        updateStreak,
+        claimDailyBonus,
+        checkAndUpdateAchievements,
       }}
     >
       {children}

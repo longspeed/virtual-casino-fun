@@ -4,6 +4,8 @@ import { BetControls } from '@/components/BetControls';
 import { useCasino } from '@/context/CasinoContext';
 import { Button } from '@/components/ui/button';
 import { rng } from '@/lib/rng';
+import { audioManager } from '@/lib/audio';
+import { Flame } from 'lucide-react';
 import {
   BlackjackGame,
   Card,
@@ -120,13 +122,14 @@ function HandDisplay({
 }
 
 export default function Blackjack() {
-  const { state, placeBet, addWinnings, logGame } = useCasino();
+  const { state, placeBet, addWinnings, logGame, updateStreak } = useCasino();
   const [bet, setBet] = useState(100);
   const [game, setGame] = useState<BlackjackGame | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
   const balance = state.user?.balance ?? 0;
   const activeHand = game?.playerHands[game.activeHandIndex];
+  const winStreak = state.streaks.currentWinStreak;
 
   // Calculate total bet for split hands
   const totalBet = game?.playerHands.reduce((sum, h) => sum + h.bet, 0) ?? 0;
@@ -210,10 +213,20 @@ export default function Blackjack() {
     
     // Calculate total payout
     const totalPayout = finalGame.results.reduce((sum, r) => sum + r.payout, 0);
+    const totalBetAmount = finalGame.playerHands.reduce((sum, h) => sum + h.bet, 0);
+    const netWin = totalPayout - totalBetAmount;
     
-    if (totalPayout > 0) {
-      addWinnings(totalPayout);
-    }
+    // Variable payout delay: longer for wins, faster for losses
+    const delay = netWin > 0 ? 400 : 150;
+    
+    setTimeout(() => {
+      if (totalPayout > 0) {
+        addWinnings(totalPayout);
+        audioManager.playWinSound(totalPayout, totalBetAmount);
+      } else {
+        audioManager.playLossSound();
+      }
+    }, delay);
     
     // Log the game
     const totalBetAmount = finalGame.playerHands.reduce((sum, h) => sum + h.bet, 0);
@@ -226,6 +239,9 @@ export default function Blackjack() {
       balanceAfter: (state.user?.balance ?? 0) + totalPayout,
       seed: rng.getSeed(),
     });
+    
+    // Update streak
+    updateStreak(netWin > 0);
     
     setTimeout(() => setIsAnimating(false), 500);
   };
@@ -242,14 +258,22 @@ export default function Blackjack() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Blackjack</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold">Blackjack</h1>
+              {winStreak >= 3 && (
+                <div className="flex items-center gap-1 text-primary animate-pulse-glow">
+                  <Flame className="h-4 w-4" />
+                  <span className="text-xs font-bold">{winStreak}</span>
+                </div>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">
               Beat the dealer without going over 21
             </p>
           </div>
           <div className="text-right text-xs text-muted-foreground">
             <div>RTP: {(getBlackjackRTP() * 100).toFixed(1)}%</div>
-            <div>Blackjack pays 3:2</div>
+            <div>Blackjack pays 6:5</div>
           </div>
         </div>
 
@@ -265,9 +289,12 @@ export default function Blackjack() {
                 disabled={false}
               />
               <Button
-                onClick={startGame}
+                onClick={() => {
+                  audioManager.playClickSound();
+                  startGame();
+                }}
                 disabled={bet > balance || bet <= 0}
-                className="w-full"
+                className="w-full interactive-button"
               >
                 Deal
               </Button>
@@ -301,24 +328,44 @@ export default function Blackjack() {
               {/* Action Buttons */}
               {game.state === 'playing' && activeHand && !isAnimating && (
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={handleHit} variant="outline" className="flex-1">
+                  <Button 
+                    onClick={() => {
+                      audioManager.playClickSound();
+                      handleHit();
+                    }} 
+                    variant="outline" 
+                    className="flex-1 interactive-button"
+                  >
                     Hit
                   </Button>
-                  <Button onClick={handleStand} variant="outline" className="flex-1">
+                  <Button 
+                    onClick={() => {
+                      audioManager.playClickSound();
+                      handleStand();
+                    }} 
+                    variant="outline" 
+                    className="flex-1 interactive-button"
+                  >
                     Stand
                   </Button>
                   <Button 
-                    onClick={handleDouble} 
+                    onClick={() => {
+                      audioManager.playClickSound();
+                      handleDouble();
+                    }} 
                     variant="outline" 
-                    className="flex-1"
+                    className="flex-1 interactive-button"
                     disabled={!canDouble(activeHand) || balance < activeHand.bet}
                   >
                     Double
                   </Button>
                   <Button 
-                    onClick={handleSplit} 
+                    onClick={() => {
+                      audioManager.playClickSound();
+                      handleSplit();
+                    }} 
                     variant="outline" 
-                    className="flex-1"
+                    className="flex-1 interactive-button"
                     disabled={!canSplit(activeHand) || balance < activeHand.bet}
                   >
                     Split
@@ -359,7 +406,7 @@ export default function Blackjack() {
         {/* Rules */}
         <div className="text-xs text-muted-foreground space-y-1">
           <p>• Dealer stands on 17, hits on 16 or less</p>
-          <p>• Blackjack pays 3:2</p>
+          <p>• Blackjack pays 6:5</p>
           <p>• Double down on any first two cards</p>
           <p>• Split pairs into separate hands</p>
         </div>

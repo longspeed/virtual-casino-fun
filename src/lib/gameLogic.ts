@@ -7,6 +7,9 @@
 
 import { rng } from './rng';
 
+// Memoization cache for expensive calculations
+const memoCache = new Map<string, any>();
+
 // =============================================================================
 // SLOT MACHINE LOGIC
 // =============================================================================
@@ -43,11 +46,17 @@ export const SLOT_PAYTABLE: SlotPaytable = {
  * @param targetRTP - Desired RTP as decimal (e.g., 0.96 for 96%)
  */
 export function getSlotWeights(targetRTP: number): number[] {
+  // Memoize for performance
+  const cacheKey = `slotWeights_${targetRTP}`;
+  if (memoCache.has(cacheKey)) {
+    return memoCache.get(cacheKey);
+  }
+  
   // Base weights (higher = more common)
   // Adjusted to achieve approximate target RTP
   const rtpFactor = targetRTP / 0.96; // Normalize to 96% base
   
-  return [
+  const weights = [
     30 * rtpFactor,  // 🍒 Cherry (most common)
     25 * rtpFactor,  // 🍋 Lemon
     20 * rtpFactor,  // 🍊 Orange
@@ -57,10 +66,13 @@ export function getSlotWeights(targetRTP: number): number[] {
     3 * rtpFactor,   // 7️⃣ Seven
     1,               // 💎 Diamond (rarest, not affected by RTP to maintain jackpot rarity)
   ];
+  
+  memoCache.set(cacheKey, weights);
+  return weights;
 }
 
 /**
- * Spin the slot machine reels
+ * Spin the slot machine reels with near-miss mechanics
  * 
  * @param rtp - Return to player percentage (0-1)
  * @returns Array of 3 symbols
@@ -80,7 +92,40 @@ export function spinSlots(rtp: number = 0.96): SlotSymbol[] {
     return SLOT_SYMBOLS[0];
   };
 
-  return [pickSymbol(), pickSymbol(), pickSymbol()];
+  const symbols = [pickSymbol(), pickSymbol(), pickSymbol()];
+  
+  // Check if this is a losing spin
+  const { win } = calculateSlotWin(symbols, 1);
+  const isLosing = win === 0;
+  
+  // Implement near-miss mechanics: 15-20% of losing spins show "almost winning" combinations
+  if (isLosing && rng.random() < 0.18) {
+    // Generate a near-miss combination
+    const nearMissTypes = [
+      // Two matching high-value symbols
+      () => {
+        const highSymbols = ['💎', '7️⃣', '⭐', '🔔'];
+        const symbol = rng.pick(highSymbols);
+        return [symbol, symbol, rng.pick([...SLOT_SYMBOLS].filter(s => s !== symbol))];
+      },
+      // Two matching with one off
+      () => {
+        const symbol = rng.pick(['💎', '7️⃣', '⭐', '🔔', '🍇']);
+        const otherSymbols = [...SLOT_SYMBOLS].filter(s => s !== symbol);
+        return [symbol, symbol, rng.pick(otherSymbols)];
+      },
+      // Three different high-value symbols
+      () => {
+        const highSymbols = ['💎', '7️⃣', '⭐', '🔔'];
+        return [rng.pick(highSymbols), rng.pick(highSymbols), rng.pick(highSymbols)];
+      },
+    ];
+    
+    const nearMissFunc = rng.pick(nearMissTypes);
+    return nearMissFunc() as SlotSymbol[];
+  }
+  
+  return symbols;
 }
 
 /**
@@ -628,9 +673,9 @@ export function dealerPlay(game: BlackjackGame): BlackjackGame {
       return { outcome: 'push' as const, payout: hand.bet };
     }
     
-    // Player blackjack pays 3:2
+    // Player blackjack pays 6:5 (reduced from 3:2)
     if (hand.isBlackjack) {
-      return { outcome: 'blackjack' as const, payout: hand.bet + Math.floor(hand.bet * 1.5) };
+      return { outcome: 'blackjack' as const, payout: hand.bet + Math.floor(hand.bet * 1.2) };
     }
     
     // Dealer blackjack beats all non-blackjack hands
