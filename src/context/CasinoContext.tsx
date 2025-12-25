@@ -15,7 +15,7 @@ export interface User {
 export interface GameLog {
   id: string;
   userId: string;
-  game: 'slots' | 'dice' | 'roulette';
+  game: 'slots' | 'dice' | 'roulette' | 'blackjack';
   bet: number;
   result: string;
   win: number;

@@ -300,3 +300,383 @@ function evaluateRouletteBet(bet: RouletteBet, pocket: RoulettePocket): boolean 
 export function getRouletteRTP(): number {
   return 36 / 37;
 }
+
+// =============================================================================
+// BLACKJACK LOGIC
+// =============================================================================
+
+export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
+export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K';
+
+export interface Card {
+  suit: Suit;
+  rank: Rank;
+  faceUp: boolean;
+}
+
+export interface BlackjackHand {
+  cards: Card[];
+  bet: number;
+  isDoubled: boolean;
+  isStanding: boolean;
+  isBusted: boolean;
+  isBlackjack: boolean;
+}
+
+export type BlackjackGameState = 'betting' | 'playing' | 'dealerTurn' | 'finished';
+
+export interface BlackjackGame {
+  deck: Card[];
+  playerHands: BlackjackHand[];
+  activeHandIndex: number;
+  dealerHand: Card[];
+  state: BlackjackGameState;
+  results: Array<{ outcome: 'win' | 'lose' | 'push' | 'blackjack'; payout: number }>;
+}
+
+const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+const RANKS: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+/**
+ * Create a fresh deck of 52 cards
+ */
+export function createDeck(): Card[] {
+  const deck: Card[] = [];
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      deck.push({ suit, rank, faceUp: true });
+    }
+  }
+  return deck;
+}
+
+/**
+ * Shuffle deck using Fisher-Yates algorithm with our RNG
+ */
+export function shuffleDeck(deck: Card[]): Card[] {
+  const shuffled = [...deck];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = rng.randomInt(0, i);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+/**
+ * Get card value for blackjack
+ * Face cards = 10, Ace = 11 or 1 (handled in getHandValue)
+ */
+export function getCardValue(card: Card): number {
+  if (card.rank === 'A') return 11;
+  if (['J', 'Q', 'K'].includes(card.rank)) return 10;
+  return parseInt(card.rank, 10);
+}
+
+/**
+ * Calculate hand value with soft ace handling
+ * Returns best possible value (treating aces as 1 if needed to stay <= 21)
+ */
+export function getHandValue(cards: Card[]): { value: number; isSoft: boolean } {
+  let value = 0;
+  let aces = 0;
+
+  for (const card of cards) {
+    if (!card.faceUp) continue;
+    value += getCardValue(card);
+    if (card.rank === 'A') aces++;
+  }
+
+  // Convert aces from 11 to 1 as needed
+  while (value > 21 && aces > 0) {
+    value -= 10;
+    aces--;
+  }
+
+  return { value, isSoft: aces > 0 && value <= 21 };
+}
+
+/**
+ * Check if hand is a natural blackjack (Ace + 10-value card)
+ */
+export function isBlackjack(cards: Card[]): boolean {
+  return cards.length === 2 && getHandValue(cards).value === 21;
+}
+
+/**
+ * Check if hand is busted
+ */
+export function isBusted(cards: Card[]): boolean {
+  return getHandValue(cards).value > 21;
+}
+
+/**
+ * Check if player can split (two cards of same rank)
+ */
+export function canSplit(hand: BlackjackHand): boolean {
+  if (hand.cards.length !== 2) return false;
+  return getCardValue(hand.cards[0]) === getCardValue(hand.cards[1]);
+}
+
+/**
+ * Check if player can double down (first two cards only)
+ */
+export function canDouble(hand: BlackjackHand): boolean {
+  return hand.cards.length === 2 && !hand.isDoubled;
+}
+
+/**
+ * Initialize a new blackjack game
+ */
+export function initBlackjack(bet: number): BlackjackGame {
+  let deck = shuffleDeck(createDeck());
+  
+  // Deal initial cards
+  const playerCard1 = { ...deck.pop()!, faceUp: true };
+  const dealerCard1 = { ...deck.pop()!, faceUp: true };
+  const playerCard2 = { ...deck.pop()!, faceUp: true };
+  const dealerCard2 = { ...deck.pop()!, faceUp: false }; // Hole card face down
+
+  const playerCards = [playerCard1, playerCard2];
+  const playerBlackjack = isBlackjack(playerCards);
+
+  return {
+    deck,
+    playerHands: [{
+      cards: playerCards,
+      bet,
+      isDoubled: false,
+      isStanding: playerBlackjack,
+      isBusted: false,
+      isBlackjack: playerBlackjack,
+    }],
+    activeHandIndex: 0,
+    dealerHand: [dealerCard1, dealerCard2],
+    state: playerBlackjack ? 'dealerTurn' : 'playing',
+    results: [],
+  };
+}
+
+/**
+ * Player hits (takes a card)
+ */
+export function blackjackHit(game: BlackjackGame): BlackjackGame {
+  if (game.state !== 'playing') return game;
+  
+  const newGame = { ...game, deck: [...game.deck], playerHands: [...game.playerHands] };
+  const hand = { ...newGame.playerHands[newGame.activeHandIndex] };
+  
+  const newCard = { ...newGame.deck.pop()!, faceUp: true };
+  hand.cards = [...hand.cards, newCard];
+  
+  if (isBusted(hand.cards)) {
+    hand.isBusted = true;
+    hand.isStanding = true;
+  }
+  
+  newGame.playerHands[newGame.activeHandIndex] = hand;
+  
+  // Move to next hand or dealer turn if current hand is done
+  if (hand.isStanding) {
+    return moveToNextHand(newGame);
+  }
+  
+  return newGame;
+}
+
+/**
+ * Player stands (keeps current hand)
+ */
+export function blackjackStand(game: BlackjackGame): BlackjackGame {
+  if (game.state !== 'playing') return game;
+  
+  const newGame = { ...game, playerHands: [...game.playerHands] };
+  const hand = { ...newGame.playerHands[newGame.activeHandIndex] };
+  hand.isStanding = true;
+  newGame.playerHands[newGame.activeHandIndex] = hand;
+  
+  return moveToNextHand(newGame);
+}
+
+/**
+ * Player doubles down (double bet, take one card, stand)
+ */
+export function blackjackDouble(game: BlackjackGame): BlackjackGame {
+  if (game.state !== 'playing') return game;
+  
+  const hand = game.playerHands[game.activeHandIndex];
+  if (!canDouble(hand)) return game;
+  
+  const newGame = { ...game, deck: [...game.deck], playerHands: [...game.playerHands] };
+  const newHand = { ...hand };
+  
+  newHand.bet *= 2;
+  newHand.isDoubled = true;
+  
+  const newCard = { ...newGame.deck.pop()!, faceUp: true };
+  newHand.cards = [...newHand.cards, newCard];
+  
+  if (isBusted(newHand.cards)) {
+    newHand.isBusted = true;
+  }
+  newHand.isStanding = true;
+  
+  newGame.playerHands[newGame.activeHandIndex] = newHand;
+  
+  return moveToNextHand(newGame);
+}
+
+/**
+ * Player splits (split pair into two hands)
+ */
+export function blackjackSplit(game: BlackjackGame): BlackjackGame {
+  if (game.state !== 'playing') return game;
+  
+  const hand = game.playerHands[game.activeHandIndex];
+  if (!canSplit(hand)) return game;
+  
+  const newGame = { ...game, deck: [...game.deck], playerHands: [...game.playerHands] };
+  
+  // Create two new hands from the split
+  const card1 = hand.cards[0];
+  const card2 = hand.cards[1];
+  
+  const newCard1 = { ...newGame.deck.pop()!, faceUp: true };
+  const newCard2 = { ...newGame.deck.pop()!, faceUp: true };
+  
+  const hand1: BlackjackHand = {
+    cards: [card1, newCard1],
+    bet: hand.bet,
+    isDoubled: false,
+    isStanding: false,
+    isBusted: false,
+    isBlackjack: false, // Split hands can't be blackjack
+  };
+  
+  const hand2: BlackjackHand = {
+    cards: [card2, newCard2],
+    bet: hand.bet,
+    isDoubled: false,
+    isStanding: false,
+    isBusted: false,
+    isBlackjack: false,
+  };
+  
+  // Replace current hand with two new hands
+  newGame.playerHands.splice(newGame.activeHandIndex, 1, hand1, hand2);
+  
+  return newGame;
+}
+
+/**
+ * Move to next hand or dealer turn
+ */
+function moveToNextHand(game: BlackjackGame): BlackjackGame {
+  const newGame = { ...game };
+  
+  // Find next active hand
+  let nextIndex = newGame.activeHandIndex + 1;
+  while (nextIndex < newGame.playerHands.length && newGame.playerHands[nextIndex].isStanding) {
+    nextIndex++;
+  }
+  
+  if (nextIndex < newGame.playerHands.length) {
+    newGame.activeHandIndex = nextIndex;
+  } else {
+    // All hands done, dealer's turn
+    newGame.state = 'dealerTurn';
+  }
+  
+  return newGame;
+}
+
+/**
+ * Dealer plays their hand (hits on 16 or less, stands on 17+)
+ */
+export function dealerPlay(game: BlackjackGame): BlackjackGame {
+  if (game.state !== 'dealerTurn') return game;
+  
+  const newGame = { ...game, deck: [...game.deck], dealerHand: [...game.dealerHand] };
+  
+  // Reveal hole card
+  newGame.dealerHand = newGame.dealerHand.map(card => ({ ...card, faceUp: true }));
+  
+  // Check if all player hands busted
+  const allBusted = newGame.playerHands.every(h => h.isBusted);
+  
+  if (!allBusted) {
+    // Dealer hits on 16 or less, stands on 17+
+    while (getHandValue(newGame.dealerHand).value < 17) {
+      const newCard = { ...newGame.deck.pop()!, faceUp: true };
+      newGame.dealerHand = [...newGame.dealerHand, newCard];
+    }
+  }
+  
+  // Calculate results
+  const dealerValue = getHandValue(newGame.dealerHand).value;
+  const dealerBusted = dealerValue > 21;
+  const dealerBlackjack = isBlackjack(newGame.dealerHand);
+  
+  newGame.results = newGame.playerHands.map(hand => {
+    if (hand.isBusted) {
+      return { outcome: 'lose' as const, payout: 0 };
+    }
+    
+    const playerValue = getHandValue(hand.cards).value;
+    
+    // Player blackjack vs dealer blackjack = push
+    if (hand.isBlackjack && dealerBlackjack) {
+      return { outcome: 'push' as const, payout: hand.bet };
+    }
+    
+    // Player blackjack pays 3:2
+    if (hand.isBlackjack) {
+      return { outcome: 'blackjack' as const, payout: hand.bet + Math.floor(hand.bet * 1.5) };
+    }
+    
+    // Dealer blackjack beats all non-blackjack hands
+    if (dealerBlackjack) {
+      return { outcome: 'lose' as const, payout: 0 };
+    }
+    
+    if (dealerBusted || playerValue > dealerValue) {
+      return { outcome: 'win' as const, payout: hand.bet * 2 };
+    }
+    
+    if (playerValue === dealerValue) {
+      return { outcome: 'push' as const, payout: hand.bet };
+    }
+    
+    return { outcome: 'lose' as const, payout: 0 };
+  });
+  
+  newGame.state = 'finished';
+  
+  return newGame;
+}
+
+/**
+ * Get suit symbol for display
+ */
+export function getSuitSymbol(suit: Suit): string {
+  switch (suit) {
+    case 'hearts': return '♥';
+    case 'diamonds': return '♦';
+    case 'clubs': return '♣';
+    case 'spades': return '♠';
+  }
+}
+
+/**
+ * Get suit color
+ */
+export function getSuitColor(suit: Suit): 'red' | 'black' {
+  return suit === 'hearts' || suit === 'diamonds' ? 'red' : 'black';
+}
+
+/**
+ * Get theoretical RTP for blackjack (basic strategy)
+ * Approximately 99.5% with optimal play
+ */
+export function getBlackjackRTP(): number {
+  return 0.995;
+}

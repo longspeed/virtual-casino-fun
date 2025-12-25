@@ -16,6 +16,7 @@ export function Layout({ children }: LayoutProps) {
     { path: '/slots', label: 'Slots' },
     { path: '/dice', label: 'Dice' },
     { path: '/roulette', label: 'Roulette' },
+    { path: '/blackjack', label: 'Blackjack' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
