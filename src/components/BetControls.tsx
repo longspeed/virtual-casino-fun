@@ -1,6 +1,5 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Minus, Plus } from 'lucide-react';
 
 interface BetControlsProps {
   bet: number;
@@ -17,79 +16,55 @@ export function BetControls({
   maxBet = 10000,
   disabled = false,
 }: BetControlsProps) {
-  const presetMultipliers = [0.5, 2];
-  const presetAmounts = [100, 500, 1000];
-
-  const adjustBet = (multiplier: number) => {
-    const newBet = Math.round(bet * multiplier);
-    onBetChange(Math.max(minBet, Math.min(maxBet, newBet)));
-  };
+  const presets = [50, 100, 500, 1000];
 
   const setBet = (amount: number) => {
     onBetChange(Math.max(minBet, Math.min(maxBet, amount)));
   };
 
   return (
-    <div className="space-y-4">
-      {/* Main Bet Input */}
+    <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Button
           variant="secondary"
-          size="icon"
-          onClick={() => adjustBet(0.5)}
+          size="sm"
+          onClick={() => setBet(Math.floor(bet / 2))}
           disabled={disabled || bet <= minBet}
+          className="mono text-xs"
         >
-          <Minus className="h-4 w-4" />
+          ½
         </Button>
 
-        <div className="relative flex-1">
-          <Input
-            type="number"
-            value={bet}
-            onChange={(e) => setBet(Number(e.target.value))}
-            min={minBet}
-            max={maxBet}
-            disabled={disabled}
-            className="text-center font-display text-lg pr-16"
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-            credits
-          </span>
-        </div>
+        <Input
+          type="number"
+          value={bet}
+          onChange={(e) => setBet(Number(e.target.value))}
+          min={minBet}
+          max={maxBet}
+          disabled={disabled}
+          className="text-center mono font-bold"
+        />
 
         <Button
           variant="secondary"
-          size="icon"
-          onClick={() => adjustBet(2)}
+          size="sm"
+          onClick={() => setBet(bet * 2)}
           disabled={disabled || bet >= maxBet}
+          className="mono text-xs"
         >
-          <Plus className="h-4 w-4" />
+          2×
         </Button>
       </div>
 
-      {/* Quick Buttons */}
-      <div className="flex gap-2 flex-wrap justify-center">
-        {presetMultipliers.map((mult) => (
+      <div className="flex gap-1.5">
+        {presets.map((amount) => (
           <Button
-            key={`mult-${mult}`}
-            variant="ghost"
-            size="sm"
-            onClick={() => adjustBet(mult)}
-            disabled={disabled}
-            className="text-xs"
-          >
-            {mult < 1 ? '½' : `${mult}×`}
-          </Button>
-        ))}
-        <span className="w-px bg-border" />
-        {presetAmounts.map((amount) => (
-          <Button
-            key={`amount-${amount}`}
+            key={amount}
             variant="ghost"
             size="sm"
             onClick={() => setBet(amount)}
-            disabled={disabled}
-            className="text-xs"
+            disabled={disabled || amount > maxBet}
+            className="flex-1 mono text-xs"
           >
             {amount >= 1000 ? `${amount / 1000}K` : amount}
           </Button>
@@ -99,7 +74,7 @@ export function BetControls({
           size="sm"
           onClick={() => setBet(maxBet)}
           disabled={disabled}
-          className="text-xs text-gold"
+          className="mono text-xs text-primary"
         >
           MAX
         </Button>

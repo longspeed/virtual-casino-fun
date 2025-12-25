@@ -10,27 +10,22 @@ interface ResultDisplayProps {
 export function ResultDisplay({ won, amount, multiplier, className }: ResultDisplayProps) {
   if (amount === 0 && !won) {
     return (
-      <div className={cn("text-center animate-fade-in", className)}>
-        <p className="text-2xl font-display font-bold text-muted-foreground">
-          No Win
-        </p>
-        <p className="text-sm text-muted-foreground mt-1">
-          Try again!
-        </p>
+      <div className={cn("text-center py-2", className)}>
+        <p className="text-lg text-muted-foreground">No win</p>
       </div>
     );
   }
 
   return (
-    <div className={cn("text-center animate-bounce-in", className)}>
+    <div className={cn("text-center py-2 animate-result", className)}>
       <p className={cn(
-        "text-3xl font-display font-bold",
-        won ? "text-emerald" : "text-crimson"
+        "mono text-2xl font-bold",
+        won ? "text-win" : "text-loss"
       )}>
         {won ? '+' : '-'}{amount.toLocaleString()}
       </p>
       {multiplier !== undefined && multiplier > 0 && (
-        <p className="text-sm text-gold mt-1 font-medium">
+        <p className="text-sm text-muted-foreground mt-0.5">
           {multiplier}× multiplier
         </p>
       )}

@@ -7,15 +7,15 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: "1.5rem",
       screens: {
-        "2xl": "1400px",
+        "2xl": "1200px",
       },
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        display: ['Cinzel', 'serif'],
+        sans: ['DM Sans', 'system-ui', 'sans-serif'],
+        mono: ['Space Mono', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -51,24 +51,9 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        gold: {
-          DEFAULT: "hsl(var(--gold))",
-          glow: "hsl(var(--gold-glow))",
-          dim: "hsl(var(--gold-dim))",
-        },
-        emerald: {
-          DEFAULT: "hsl(var(--emerald))",
-          glow: "hsl(var(--emerald-glow))",
-        },
-        crimson: {
-          DEFAULT: "hsl(var(--crimson))",
-          glow: "hsl(var(--crimson-glow))",
-        },
-        royal: "hsl(var(--royal-purple))",
-        navy: {
-          DEFAULT: "hsl(var(--navy))",
-          deep: "hsl(var(--navy-deep))",
-        },
+        win: "hsl(var(--win))",
+        loss: "hsl(var(--loss))",
+        highlight: "hsl(var(--highlight))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -94,39 +79,10 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "reel-spin": {
-          "0%": { transform: "translateY(0)" },
-          "100%": { transform: "translateY(-100%)" },
-        },
-        "win-pulse": {
-          "0%, 100%": { transform: "scale(1)", opacity: "1" },
-          "50%": { transform: "scale(1.1)", opacity: "0.8" },
-        },
-        "coin-flip": {
-          "0%": { transform: "rotateY(0deg)" },
-          "100%": { transform: "rotateY(360deg)" },
-        },
-        "fade-in": {
-          "0%": { opacity: "0" },
-          "100%": { opacity: "1" },
-        },
-        "slide-in-right": {
-          "0%": { transform: "translateX(100%)", opacity: "0" },
-          "100%": { transform: "translateX(0)", opacity: "1" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "reel-spin": "reel-spin 0.1s linear infinite",
-        "win-pulse": "win-pulse 0.5s ease-in-out",
-        "coin-flip": "coin-flip 0.5s ease-in-out",
-        "fade-in": "fade-in 0.3s ease-out",
-        "slide-in-right": "slide-in-right 0.3s ease-out",
-      },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'casino-pattern': 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.02"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
       },
     },
   },
