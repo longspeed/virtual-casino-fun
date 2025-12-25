@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useCasino } from '@/context/CasinoContext';
 import { Layout } from '@/components/Layout';
 import { BetControls } from '@/components/BetControls';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { spinSlots, calculateSlotWin, SLOT_SYMBOLS, SLOT_PAYTABLE, SlotSymbol } from '@/lib/gameLogic';
 import { rng } from '@/lib/rng';
 import { cn } from '@/lib/utils';
-import { Play, Info } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Slots() {
@@ -24,16 +24,15 @@ export default function Slots() {
   const spin = async () => {
     if (!state.user) return;
     if (!placeBet(bet)) {
-      toast.error('Insufficient balance!');
+      toast.error('Insufficient balance');
       return;
     }
 
     setSpinning(true);
     setResult(null);
 
-    // Animate reels
-    const animationDuration = 1500;
-    const spinInterval = 80;
+    const animationDuration = 1200;
+    const spinInterval = 60;
     let elapsed = 0;
 
     const interval = setInterval(() => {
@@ -47,7 +46,6 @@ export default function Slots() {
       if (elapsed >= animationDuration) {
         clearInterval(interval);
         
-        // Final result
         const finalReels = spinSlots(rtp);
         const { multiplier, win } = calculateSlotWin(finalReels, bet);
         
@@ -57,7 +55,7 @@ export default function Slots() {
 
         if (win > 0) {
           addWinnings(win);
-          toast.success(`You won ${win.toLocaleString()} credits!`);
+          toast.success(`Won ${win.toLocaleString()} credits`);
         }
 
         logGame({
@@ -74,30 +72,30 @@ export default function Slots() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-md mx-auto space-y-4">
         {/* Header */}
         <div className="text-center">
-          <h1 className="font-display text-3xl font-bold gold-text">Slot Machine</h1>
-          <p className="text-muted-foreground mt-2">
-            Match symbols to win! RTP: {(rtp * 100).toFixed(1)}%
+          <h1 className="text-xl font-semibold">Slots</h1>
+          <p className="text-xs text-muted-foreground">
+            RTP: {(rtp * 100).toFixed(1)}%
           </p>
         </div>
 
-        {/* Slot Machine */}
-        <div className="casino-card">
+        {/* Game Card */}
+        <div className="game-card space-y-4">
           {/* Reels */}
-          <div className="bg-secondary rounded-xl p-6 mb-6">
-            <div className="flex justify-center gap-4">
+          <div className="bg-secondary rounded-md p-6">
+            <div className="flex justify-center gap-3">
               {reels.map((symbol, i) => (
                 <div
                   key={i}
                   className={cn(
-                    "w-24 h-28 flex items-center justify-center rounded-lg bg-navy-deep border-2 border-gold/30 text-5xl",
-                    spinning && "animate-pulse",
-                    result?.won && "border-emerald shadow-lg shadow-emerald/30"
+                    "w-16 h-20 flex items-center justify-center rounded-md bg-background border border-border text-4xl",
+                    spinning && "opacity-70",
+                    result?.won && "border-primary"
                   )}
                 >
-                  <span className={cn(spinning && "animate-bounce")}>
+                  <span className={cn(spinning && "animate-number")}>
                     {symbol}
                   </span>
                 </div>
@@ -107,64 +105,56 @@ export default function Slots() {
 
           {/* Result */}
           {result && !spinning && (
-            <div className="mb-6">
-              <ResultDisplay
-                won={result.won}
-                amount={result.amount}
-                multiplier={result.multiplier}
-              />
-            </div>
+            <ResultDisplay
+              won={result.won}
+              amount={result.amount}
+              multiplier={result.multiplier}
+            />
           )}
 
           {/* Bet Controls */}
-          <div className="mb-6">
-            <BetControls
-              bet={bet}
-              onBetChange={setBet}
-              maxBet={maxBet}
-              disabled={spinning}
-            />
-          </div>
+          <BetControls
+            bet={bet}
+            onBetChange={setBet}
+            maxBet={maxBet}
+            disabled={spinning}
+          />
 
           {/* Spin Button */}
           <Button
-            variant="gold"
-            size="xl"
             className="w-full"
+            size="xl"
             onClick={spin}
             disabled={spinning || bet > (state.user?.balance || 0)}
           >
-            <Play className="h-5 w-5" />
-            {spinning ? 'Spinning...' : 'SPIN'}
+            {spinning ? 'Spinning...' : 'Spin'}
           </Button>
         </div>
 
         {/* Paytable */}
-        <div className="casino-card">
+        <div className="game-card">
           <button
             onClick={() => setShowPaytable(!showPaytable)}
             className="w-full flex items-center justify-between text-left"
           >
-            <span className="flex items-center gap-2 font-display text-lg font-semibold">
-              <Info className="h-5 w-5 text-gold" />
-              Paytable
-            </span>
-            <span className="text-muted-foreground">
-              {showPaytable ? '−' : '+'}
-            </span>
+            <span className="text-sm font-medium">Paytable</span>
+            <ChevronDown className={cn(
+              "h-4 w-4 text-muted-foreground transition-transform",
+              showPaytable && "rotate-180"
+            )} />
           </button>
 
           {showPaytable && (
-            <div className="mt-4 pt-4 border-t border-border space-y-2">
+            <div className="mt-3 pt-3 border-t border-border space-y-1.5">
               {Object.entries(SLOT_PAYTABLE)
                 .sort(([, a], [, b]) => b - a)
                 .map(([symbols, multiplier]) => (
                   <div
                     key={symbols}
-                    className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/50"
+                    className="flex items-center justify-between py-1.5 px-2 rounded bg-secondary text-sm"
                   >
-                    <span className="text-2xl tracking-wider">{symbols}</span>
-                    <span className="font-display font-semibold text-gold">
+                    <span className="text-xl tracking-wider">{symbols}</span>
+                    <span className="mono font-medium text-primary">
                       {multiplier}×
                     </span>
                   </div>

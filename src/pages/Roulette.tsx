@@ -7,19 +7,16 @@ import { Button } from '@/components/ui/button';
 import { spinRoulette, RouletteBet, RouletteBetType, ROULETTE_PAYOUTS, getRouletteRTP, RouletteColor } from '@/lib/gameLogic';
 import { rng } from '@/lib/rng';
 import { cn } from '@/lib/utils';
-import { CircleDot, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { toast } from 'sonner';
 
-const BETTING_OPTIONS: { type: RouletteBetType; label: string; color?: string }[] = [
-  { type: 'red', label: 'Red', color: 'bg-crimson' },
-  { type: 'black', label: 'Black', color: 'bg-primary-foreground' },
+const BETTING_OPTIONS: { type: RouletteBetType; label: string }[] = [
+  { type: 'red', label: 'Red' },
+  { type: 'black', label: 'Black' },
   { type: 'odd', label: 'Odd' },
   { type: 'even', label: 'Even' },
   { type: 'low', label: '1-18' },
   { type: 'high', label: '19-36' },
-  { type: 'dozen1', label: '1st 12' },
-  { type: 'dozen2', label: '2nd 12' },
-  { type: 'dozen3', label: '3rd 12' },
 ];
 
 const ROULETTE_NUMBERS: { num: number; color: RouletteColor }[] = [
@@ -46,7 +43,7 @@ export default function Roulette() {
 
   const addBet = (type: RouletteBetType, number?: number) => {
     if (betAmount > (state.user?.balance || 0) - totalBet) {
-      toast.error('Insufficient balance for this bet!');
+      toast.error('Insufficient balance');
       return;
     }
 
@@ -71,19 +68,18 @@ export default function Roulette() {
 
   const spin = () => {
     if (!state.user || bets.length === 0) {
-      toast.error('Place at least one bet!');
+      toast.error('Place at least one bet');
       return;
     }
 
     if (!deductBet(totalBet)) {
-      toast.error('Insufficient balance!');
+      toast.error('Insufficient balance');
       return;
     }
 
     setSpinning(true);
     setWinAmount(null);
 
-    // Animate
     setTimeout(() => {
       const result = spinRoulette(bets);
       
@@ -96,7 +92,7 @@ export default function Roulette() {
 
       if (result.totalWin > 0) {
         addWinnings(result.totalWin);
-        toast.success(`You won ${result.totalWin.toLocaleString()} credits!`);
+        toast.success(`Won ${result.totalWin.toLocaleString()} credits`);
       }
 
       logGame({
@@ -109,38 +105,38 @@ export default function Roulette() {
       });
 
       setBets([]);
-    }, 2000);
+    }, 1500);
   };
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-4">
         {/* Header */}
         <div className="text-center">
-          <h1 className="font-display text-3xl font-bold gold-text">European Roulette</h1>
-          <p className="text-muted-foreground mt-2">
-            Single zero wheel • RTP: {(rtp * 100).toFixed(1)}%
+          <h1 className="text-xl font-semibold">Roulette</h1>
+          <p className="text-xs text-muted-foreground">
+            European wheel • RTP: {(rtp * 100).toFixed(1)}%
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Wheel & Result */}
-          <div className="lg:col-span-2 casino-card">
+        <div className="grid lg:grid-cols-5 gap-4">
+          {/* Main Game Area */}
+          <div className="lg:col-span-3 game-card space-y-4">
             {/* Wheel Display */}
-            <div className="bg-secondary rounded-xl p-8 mb-6 text-center">
+            <div className="bg-secondary rounded-md p-6 text-center">
               <div className={cn(
-                "inline-flex items-center justify-center w-36 h-36 rounded-full border-8",
-                spinning && "animate-spin",
-                lastResult?.color === 'red' && "border-crimson bg-crimson/20",
+                "inline-flex items-center justify-center w-28 h-28 rounded-full border-4",
+                spinning && "animate-pulse",
+                lastResult?.color === 'red' && "border-destructive bg-destructive/20",
                 lastResult?.color === 'black' && "border-foreground bg-foreground/10",
-                lastResult?.color === 'green' && "border-emerald bg-emerald/20",
-                !lastResult && "border-gold/30 bg-navy-deep"
+                lastResult?.color === 'green' && "border-primary bg-primary/20",
+                !lastResult && "border-border bg-background"
               )}>
                 <span className={cn(
-                  "font-display text-5xl font-bold",
-                  lastResult?.color === 'red' && "text-crimson",
+                  "mono text-4xl font-bold",
+                  lastResult?.color === 'red' && "text-destructive",
                   lastResult?.color === 'black' && "text-foreground",
-                  lastResult?.color === 'green' && "text-emerald",
+                  lastResult?.color === 'green' && "text-primary",
                   !lastResult && "text-muted-foreground"
                 )}>
                   {spinning ? '?' : (lastResult?.number ?? '?')}
@@ -150,35 +146,31 @@ export default function Roulette() {
 
             {/* Result */}
             {winAmount !== null && !spinning && (
-              <div className="mb-6">
-                <ResultDisplay
-                  won={winAmount > 0}
-                  amount={winAmount > 0 ? winAmount : totalBet}
-                />
-              </div>
+              <ResultDisplay
+                won={winAmount > 0}
+                amount={winAmount > 0 ? winAmount : totalBet}
+              />
             )}
 
             {/* Number Grid */}
-            <div className="mb-6">
-              <p className="text-sm text-muted-foreground mb-3">Straight Bets (35:1)</p>
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Straight (35:1)</p>
               <div className="grid grid-cols-12 gap-1">
-                {/* Zero */}
                 <button
                   onClick={() => addBet('straight', 0)}
                   disabled={spinning}
-                  className="col-span-12 py-2 rounded-lg bg-emerald text-foreground font-bold hover:opacity-80 transition-opacity disabled:opacity-50"
+                  className="col-span-12 py-1.5 rounded text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
                 >
                   0
                 </button>
-                {/* Numbers 1-36 */}
                 {ROULETTE_NUMBERS.slice(1).map(({ num, color }) => (
                   <button
                     key={num}
                     onClick={() => addBet('straight', num)}
                     disabled={spinning}
                     className={cn(
-                      "py-2 rounded text-foreground font-bold text-sm hover:opacity-80 transition-opacity disabled:opacity-50",
-                      color === 'red' ? 'bg-crimson' : 'bg-foreground/90 text-background'
+                      "py-1.5 rounded text-sm font-medium hover:opacity-80 transition-opacity disabled:opacity-50",
+                      color === 'red' ? 'bg-destructive text-destructive-foreground' : 'bg-foreground text-background'
                     )}
                   >
                     {num}
@@ -189,16 +181,20 @@ export default function Roulette() {
 
             {/* Outside Bets */}
             <div>
-              <p className="text-sm text-muted-foreground mb-3">Outside Bets</p>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {BETTING_OPTIONS.map(({ type, label, color }) => (
+              <p className="text-xs text-muted-foreground mb-2">Outside Bets</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {BETTING_OPTIONS.map(({ type, label }) => (
                   <Button
                     key={type}
                     variant="secondary"
                     size="sm"
                     onClick={() => addBet(type)}
                     disabled={spinning}
-                    className={cn("font-semibold", color)}
+                    className={cn(
+                      "text-xs",
+                      type === 'red' && "bg-destructive/20 hover:bg-destructive/30",
+                      type === 'black' && "bg-foreground/10 hover:bg-foreground/20"
+                    )}
                   >
                     {label} ({ROULETTE_PAYOUTS[type]}:1)
                   </Button>
@@ -208,30 +204,28 @@ export default function Roulette() {
           </div>
 
           {/* Betting Panel */}
-          <div className="casino-card">
-            <h3 className="font-display text-lg font-semibold mb-4">Place Bets</h3>
+          <div className="lg:col-span-2 game-card space-y-4">
+            <h3 className="font-medium">Place Bets</h3>
 
             {/* Bet Amount */}
-            <div className="mb-6">
-              <BetControls
-                bet={betAmount}
-                onBetChange={setBetAmount}
-                maxBet={maxBet - totalBet}
-                disabled={spinning}
-              />
-            </div>
+            <BetControls
+              bet={betAmount}
+              onBetChange={setBetAmount}
+              maxBet={maxBet - totalBet}
+              disabled={spinning}
+            />
 
             {/* Current Bets */}
-            <div className="mb-6">
+            <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Current Bets</span>
+                <span className="text-xs text-muted-foreground">Current Bets</span>
                 {bets.length > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={clearBets}
                     disabled={spinning}
-                    className="h-6 text-xs"
+                    className="h-6 text-xs px-2"
                   >
                     <X className="h-3 w-3 mr-1" />
                     Clear
@@ -239,21 +233,21 @@ export default function Roulette() {
                 )}
               </div>
               
-              <div className="max-h-40 overflow-y-auto space-y-1">
+              <div className="max-h-32 overflow-y-auto space-y-1">
                 {bets.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    Click on the table to place bets
+                  <p className="text-xs text-muted-foreground py-3 text-center">
+                    Click numbers or bets to add
                   </p>
                 ) : (
                   bets.map((bet, i) => (
                     <div
                       key={i}
-                      className="flex justify-between text-sm py-1 px-2 bg-secondary/50 rounded"
+                      className="flex justify-between text-xs py-1.5 px-2 bg-secondary rounded"
                     >
                       <span>
                         {bet.type === 'straight' ? `#${bet.number}` : bet.type}
                       </span>
-                      <span className="text-gold">{bet.amount}</span>
+                      <span className="mono text-primary">{bet.amount}</span>
                     </div>
                   ))
                 )}
@@ -261,10 +255,10 @@ export default function Roulette() {
             </div>
 
             {/* Total */}
-            <div className="p-3 bg-secondary rounded-lg mb-4">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Total Bet</span>
-                <span className="font-display font-bold text-gold">
+            <div className="p-2 bg-secondary rounded-md">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total</span>
+                <span className="mono font-bold text-primary">
                   {totalBet.toLocaleString()}
                 </span>
               </div>
@@ -272,14 +266,12 @@ export default function Roulette() {
 
             {/* Spin Button */}
             <Button
-              variant="gold"
-              size="lg"
               className="w-full"
+              size="lg"
               onClick={spin}
               disabled={spinning || bets.length === 0}
             >
-              <CircleDot className="h-5 w-5" />
-              {spinning ? 'Spinning...' : 'SPIN'}
+              {spinning ? 'Spinning...' : 'Spin'}
             </Button>
           </div>
         </div>
