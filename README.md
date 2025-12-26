@@ -1,73 +1,98 @@
-# Welcome to your Lovable project
+# Virtual Casino Fun
 
-## Project info
+An educational virtual casino simulation built with React, TypeScript, and Vite.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Project Description
 
-## How can I edit this code?
+Virtual Casino Fun is a virtual casino simulation designed for educational purposes to understand casino game mechanics and their underlying systems. The project demonstrates how casino games work, including random number generation, game logic, and player interaction patterns. It uses seeded random number generation (Mulberry32 algorithm) for reproducible and auditable results, making it suitable for studying game mechanics and probability.
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+- **Four Casino Games:**
+  - **Slots** - Slot machine game with near-miss mechanics
+  - **Dice** - Multiplier-based dice rolling game
+  - **Roulette** - European-style roulette wheel
+  - **Blackjack** - Card game with card counting capabilities
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- **Seeded Random Number Generation** - Uses Mulberry32 algorithm for reproducible results
+- **Achievement System** - Progress tracking with unlockable achievements
+- **Daily Bonus System** - Daily rewards for returning players
+- **Admin Panel** - Game configuration and management interface
+- **Persistent State** - LocalStorage-based state persistence
+- **Responsive UI** - Modern interface built with shadcn/ui components
 
-Changes made via Lovable will be committed automatically to this repo.
+## ⚠️ Ethical Disclaimer
 
-**Use your preferred IDE**
+**IMPORTANT WARNING:** This project implements psychological manipulation techniques commonly used in real gambling establishments. These mechanics are included for educational purposes to demonstrate how casinos manipulate player psychology and encourage continued play.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+**Specific Disclosures:**
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Near-Miss Mechanics:** Approximately 18% of losing spins in the slot machine game display "almost winning" combinations (e.g., two matching symbols with a third just missing). This is intentionally designed to create the illusion of being close to winning, which encourages players to continue betting.
 
-Follow these steps:
+- **Variable Payout Delays:** The game implements differential timing for wins and losses:
+  - Wins are delayed by 300ms
+  - Losses are processed after 100ms
+  
+  This timing difference is designed to encourage rapid re-betting by making losses feel faster and wins feel more rewarding, creating a psychological incentive to continue playing.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+**Educational Purpose:** These mechanics are included to provide transparency about how gambling systems work and to serve as a learning resource for understanding the psychological techniques used in the gambling industry.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+**Recommendation:** Any fork or derivative of this project should either remove these psychological manipulation mechanics or clearly disclose them to users. Users should be aware that these techniques are designed to encourage continued play and can contribute to problematic gambling behaviors.
 
-# Step 3: Install the necessary dependencies.
-npm i
+## Technologies Used
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+- **React 18** - UI framework
+- **TypeScript** - Type-safe JavaScript
+- **Vite** - Build tool and development server
+- **shadcn/ui** - Component library
+- **Tailwind CSS** - Utility-first CSS framework
+- **React Router** - Navigation and routing
+- **Context API** - State management
 
-**Edit a file directly in GitHub**
+## Setup Instructions
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. **Clone the repository**
+   ```sh
+   git clone <YOUR_GIT_URL>
+   cd virtual-casino-fun
+   ```
 
-**Use GitHub Codespaces**
+2. **Install dependencies**
+   ```sh
+   npm install
+   ```
+   or
+   ```sh
+   bun install
+   ```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3. **Run development server**
+   ```sh
+   npm run dev
+   ```
+   The application will be available at `http://localhost:5173` (or the port shown in the terminal).
 
-## What technologies are used for this project?
+4. **Build for production**
+   ```sh
+   npm run build
+   ```
 
-This project is built with:
+5. **Preview production build**
+   ```sh
+   npm run preview
+   ```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Project Structure
 
-## How can I deploy this project?
+- `src/pages/` - Game pages (Slots, Dice, Roulette, Blackjack, Admin)
+- `src/lib/` - Core game logic, RNG, achievements
+- `src/context/` - Casino state management
+- `src/components/` - Reusable UI components
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## License
 
-## Can I connect a custom domain to my Lovable project?
+All Rights Reserved
 
-Yes, you can!
+## Contributing
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+This is a personal/educational project and not accepting contributions.

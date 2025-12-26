@@ -613,7 +613,7 @@ export function blackjackSplit(game: BlackjackGame): BlackjackGame {
 }
 
 /**
- * Move to next hand or dealer turn
+ * Move to next hand or dealer turn ngoc son gay qay
  */
 function moveToNextHand(game: BlackjackGame): BlackjackGame {
   const newGame = { ...game };

@@ -1,5 +1,6 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "virtual-casino-fun",
+  "description": "A virtual casino simulation with slots, dice, roulette, and blackjack games",
   "private": true,
   "version": "0.0.0",
   "type": "module",
