@@ -14,6 +14,16 @@ import {
   Unlock
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  validateDefaultBalance,
+  validateSlotRTP,
+  validateDiceHouseEdge,
+  validateRNGSeed,
+  BOUNDS,
+} from '@/lib/validation';
+
+// Get admin password from environment variable
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '';
 
 export default function Admin() {
   const { state, dispatch } = useCasino();
@@ -29,9 +39,14 @@ export default function Admin() {
   const [adminPassword, setAdminPassword] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
 
-  const ADMIN_PASSWORD = 'test123';
+  // If no admin password is set, disable admin panel
+  const isAdminEnabled = ADMIN_PASSWORD.length > 0;
 
   const unlockAdmin = () => {
+    if (!isAdminEnabled) {
+      toast.error('Admin panel is disabled');
+      return;
+    }
     if (adminPassword === ADMIN_PASSWORD) {
       setIsUnlocked(true);
       toast.success('Admin panel unlocked');
@@ -51,7 +66,20 @@ export default function Admin() {
   };
 
   const updateSetting = (key: string, value: number | null) => {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: { [key]: value } });
+    let validatedValue: number | null = value;
+
+    // Validate and sanitize based on setting type
+    if (key === 'defaultBalance' && value !== null) {
+      validatedValue = validateDefaultBalance(value);
+    } else if (key === 'slotRTP' && value !== null) {
+      validatedValue = validateSlotRTP(value);
+    } else if (key === 'diceHouseEdge' && value !== null) {
+      validatedValue = validateDiceHouseEdge(value);
+    } else if (key === 'rngSeed') {
+      validatedValue = validateRNGSeed(value);
+    }
+
+    dispatch({ type: 'UPDATE_SETTINGS', payload: { [key]: validatedValue } });
     toast.success('Settings updated');
   };
 
@@ -91,6 +119,23 @@ export default function Admin() {
     setSimulating(false);
   };
 
+  // If admin is disabled, show message
+  if (!isAdminEnabled) {
+    return (
+      <Layout>
+        <div className="max-w-sm mx-auto">
+          <div className="game-card text-center">
+            <Lock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h1 className="text-xl font-semibold mb-2">Admin Panel</h1>
+            <p className="text-sm text-muted-foreground">
+              Admin panel is disabled. Set VITE_ADMIN_PASSWORD environment variable to enable.
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (!isUnlocked) {
     return (
       <Layout>
@@ -100,9 +145,6 @@ export default function Admin() {
             <h1 className="text-xl font-semibold mb-2">Admin Panel</h1>
             <p className="text-sm text-muted-foreground mb-4">
               Enter password to access
-            </p>
-            <p className="text-xs text-muted-foreground mb-4">
-              (Hint: test123)
             </p>
             <div className="space-y-3">
               <Input
@@ -149,8 +191,8 @@ export default function Admin() {
                 onChange={(e) =>
                   updateSetting('defaultBalance', Number(e.target.value))
                 }
-                min={100}
-                max={1000000}
+                min={BOUNDS.MIN_DEFAULT_BALANCE}
+                max={BOUNDS.MAX_DEFAULT_BALANCE}
                 className="mt-1"
               />
             </div>
@@ -167,8 +209,8 @@ export default function Admin() {
                 onValueChange={([value]) =>
                   updateSetting('slotRTP', value / 100)
                 }
-                min={80}
-                max={99}
+                min={BOUNDS.MIN_SLOT_RTP * 100}
+                max={BOUNDS.MAX_SLOT_RTP * 100}
                 step={0.5}
               />
             </div>
@@ -185,8 +227,8 @@ export default function Admin() {
                 onValueChange={([value]) =>
                   updateSetting('diceHouseEdge', value / 100)
                 }
-                min={0}
-                max={10}
+                min={BOUNDS.MIN_DICE_HOUSE_EDGE * 100}
+                max={BOUNDS.MAX_DICE_HOUSE_EDGE * 100}
                 step={0.5}
               />
             </div>
@@ -260,7 +302,12 @@ export default function Admin() {
                 <Input
                   type="number"
                   value={simulations}
-                  onChange={(e) => setSimulations(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (!isNaN(val) && val >= 100 && val <= 100000) {
+                      setSimulations(val);
+                    }
+                  }}
                   min={100}
                   max={100000}
                   className="mt-1"

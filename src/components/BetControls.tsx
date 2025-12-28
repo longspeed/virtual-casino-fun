@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { validateBetAmount, BOUNDS } from '@/lib/validation';
 
 interface BetControlsProps {
   bet: number;
@@ -12,14 +13,16 @@ interface BetControlsProps {
 export function BetControls({
   bet,
   onBetChange,
-  minBet = 10,
-  maxBet = 10000999,
+  minBet = BOUNDS.MIN_BET,
+  maxBet = BOUNDS.MAX_BET,
   disabled = false,
 }: BetControlsProps) {
   const presets = [50, 100, 500, 1000];
 
-  const setBet = (amount: number) => {
-    onBetChange(Math.max(minBet, Math.min(maxBet, amount)));
+  const setBet = (amount: unknown) => {
+    const validated = validateBetAmount(amount, maxBet);
+    const clamped = Math.max(minBet, Math.min(maxBet, validated));
+    onBetChange(clamped);
   };
 
   return (
@@ -38,7 +41,15 @@ export function BetControls({
         <Input
           type="number"
           value={bet}
-          onChange={(e) => setBet(Number(e.target.value))}
+          onChange={(e) => {
+            const value = e.target.value === '' ? minBet : Number(e.target.value);
+            setBet(value);
+          }}
+          onBlur={(e) => {
+            // Ensure value is valid on blur
+            const value = e.target.value === '' ? minBet : Number(e.target.value);
+            setBet(value);
+          }}
           min={minBet}
           max={maxBet}
           disabled={disabled}

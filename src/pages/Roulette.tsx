@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { X, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 import { audioManager } from '@/lib/audio';
+import { validateBetAmount, BOUNDS } from '@/lib/validation';
 
 const BETTING_OPTIONS: { type: RouletteBetType; label: string }[] = [
   { type: 'red', label: 'Red' },
@@ -44,8 +45,16 @@ export default function Roulette() {
   const winStreak = state.streaks.currentWinStreak;
 
   const addBet = (type: RouletteBetType, number?: number) => {
-    if (betAmount > (state.user?.balance || 0) - totalBet) {
+    // Validate bet amount
+    const validatedBetAmount = validateBetAmount(betAmount, maxBet - totalBet);
+    
+    if (validatedBetAmount > (state.user?.balance || 0) - totalBet) {
       toast.error('Insufficient balance');
+      return;
+    }
+
+    if (validatedBetAmount < BOUNDS.MIN_BET) {
+      toast.error(`Minimum bet is ${BOUNDS.MIN_BET}`);
       return;
     }
 
@@ -55,10 +64,13 @@ export default function Roulette() {
 
     if (existingBetIndex >= 0) {
       const updated = [...bets];
-      updated[existingBetIndex].amount += betAmount;
+      updated[existingBetIndex].amount = validateBetAmount(
+        updated[existingBetIndex].amount + validatedBetAmount,
+        maxBet
+      );
       setBets(updated);
     } else {
-      setBets([...bets, { type, number, amount: betAmount }]);
+      setBets([...bets, { type, number, amount: validatedBetAmount }]);
     }
   };
 
