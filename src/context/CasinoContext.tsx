@@ -1,6 +1,16 @@
-import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { rng } from '@/lib/rng';
 import { AchievementProgress, checkAchievements, ACHIEVEMENTS } from '@/lib/achievements';
+import {
+  validateBalance,
+  validateDefaultBalance,
+  validateSlotRTP,
+  validateDiceHouseEdge,
+  validateRNGSeed,
+  validateBetAmount,
+  BOUNDS,
+} from '@/lib/validation';
+import { logger } from '@/lib/logger';
 
 // =============================================================================
 // TYPES
@@ -94,17 +104,77 @@ const loadState = (): CasinoState => {
     const saved = localStorage.getItem('casinoState');
     if (saved) {
       const parsed = JSON.parse(saved);
-      return {
-        ...parsed,
-        user: parsed.user ? { ...parsed.user, createdAt: new Date(parsed.user.createdAt) } : null,
-        gameLogs: parsed.gameLogs?.map((log: GameLog) => ({
-          ...log,
-          timestamp: new Date(log.timestamp),
-        })) || [],
+      
+      // Validate and sanitize loaded state to prevent manipulation
+      const validatedState: CasinoState = {
+        user: parsed.user
+          ? {
+              id: typeof parsed.user.id === 'string' ? parsed.user.id : crypto.randomUUID(),
+              username: typeof parsed.user.username === 'string' 
+                ? parsed.user.username.slice(0, 50) 
+                : 'Guest',
+              balance: validateBalance(parsed.user.balance),
+              createdAt: parsed.user.createdAt 
+                ? new Date(parsed.user.createdAt) 
+                : new Date(),
+            }
+          : null,
+        settings: {
+          defaultBalance: validateDefaultBalance(parsed.settings?.defaultBalance),
+          slotRTP: validateSlotRTP(parsed.settings?.slotRTP),
+          diceHouseEdge: validateDiceHouseEdge(parsed.settings?.diceHouseEdge),
+          rngSeed: validateRNGSeed(parsed.settings?.rngSeed),
+        },
+        gameLogs: Array.isArray(parsed.gameLogs)
+          ? parsed.gameLogs
+              .slice(0, 1000) // Limit to 1000 logs
+              .map((log: any) => ({
+                id: typeof log.id === 'string' ? log.id : crypto.randomUUID(),
+                userId: typeof log.userId === 'string' ? log.userId : '',
+                game: ['slots', 'dice', 'roulette', 'blackjack'].includes(log.game)
+                  ? log.game
+                  : 'slots',
+                bet: validateBetAmount(log.bet, BOUNDS.MAX_BET),
+                result: typeof log.result === 'string' ? log.result.slice(0, 200) : '',
+                win: validateBalance(log.win),
+                balanceAfter: validateBalance(log.balanceAfter),
+                timestamp: log.timestamp ? new Date(log.timestamp) : new Date(),
+                seed: typeof log.seed === 'number' ? log.seed : 0,
+              }))
+          : [],
+        isAdmin: typeof parsed.isAdmin === 'boolean' ? parsed.isAdmin : false,
+        streaks: {
+          currentWinStreak: Math.max(0, Math.min(10000, Number(parsed.streaks?.currentWinStreak) || 0)),
+          currentLossStreak: Math.max(0, Math.min(10000, Number(parsed.streaks?.currentLossStreak) || 0)),
+          longestWinStreak: Math.max(0, Math.min(10000, Number(parsed.streaks?.longestWinStreak) || 0)),
+          longestLossStreak: Math.max(0, Math.min(10000, Number(parsed.streaks?.longestLossStreak) || 0)),
+        },
+        achievements: Array.isArray(parsed.achievements) ? parsed.achievements.slice(0, 100) : [],
+        dailyBonus: {
+          lastClaimDate: typeof parsed.dailyBonus?.lastClaimDate === 'string' 
+            ? parsed.dailyBonus.lastClaimDate 
+            : null,
+          consecutiveDays: Math.max(0, Math.min(365, Number(parsed.dailyBonus?.consecutiveDays) || 0)),
+          nextBonusAmount: Math.max(0, Math.min(1000000, Number(parsed.dailyBonus?.nextBonusAmount) || 100)),
+        },
+        stats: {
+          totalGames: Math.max(0, Number(parsed.stats?.totalGames) || 0),
+          totalWins: Math.max(0, Number(parsed.stats?.totalWins) || 0),
+          biggestWin: Math.max(0, Math.min(BOUNDS.MAX_BALANCE, Number(parsed.stats?.biggestWin) || 0)),
+          biggestBet: Math.max(0, Math.min(BOUNDS.MAX_BET, Number(parsed.stats?.biggestBet) || 0)),
+          gameWins: typeof parsed.stats?.gameWins === 'object' && parsed.stats.gameWins !== null
+            ? parsed.stats.gameWins
+            : {},
+          specialEvents: typeof parsed.stats?.specialEvents === 'object' && parsed.stats.specialEvents !== null
+            ? parsed.stats.specialEvents
+            : {},
+        },
       };
+      
+      return validatedState;
     }
   } catch (e) {
-    console.error('Failed to load casino state:', e);
+    logger.error('Failed to load casino state:', e);
   }
   return {
     user: null,
@@ -143,12 +213,17 @@ function casinoReducer(state: CasinoState, action: CasinoAction): CasinoState {
 
   switch (action.type) {
     case 'LOGIN':
+      // Sanitize username
+      const sanitizedUsername = typeof action.payload.username === 'string'
+        ? action.payload.username.slice(0, 50).trim() || 'Guest'
+        : 'Guest';
+      
       newState = {
         ...state,
         user: {
           id: crypto.randomUUID(),
-          username: action.payload.username,
-          balance: state.settings.defaultBalance,
+          username: sanitizedUsername,
+          balance: validateBalance(state.settings.defaultBalance),
           createdAt: new Date(),
         },
       };
@@ -160,7 +235,7 @@ function casinoReducer(state: CasinoState, action: CasinoAction): CasinoState {
         user: {
           id: crypto.randomUUID(),
           username: `Guest_${Math.floor(Math.random() * 10000)}`,
-          balance: state.settings.defaultBalance,
+          balance: validateBalance(state.settings.defaultBalance),
           createdAt: new Date(),
         },
       };
@@ -174,16 +249,29 @@ function casinoReducer(state: CasinoState, action: CasinoAction): CasinoState {
       if (!state.user) return state;
       newState = {
         ...state,
-        user: { ...state.user, balance: Math.max(0, action.payload) },
+        user: { ...state.user, balance: validateBalance(action.payload) },
       };
       break;
 
     case 'ADD_GAME_LOG':
+      // Validate and sanitize game log data
+      const validatedLog: Omit<GameLog, 'id' | 'timestamp'> = {
+        userId: typeof action.payload.userId === 'string' ? action.payload.userId : '',
+        game: ['slots', 'dice', 'roulette', 'blackjack'].includes(action.payload.game)
+          ? action.payload.game
+          : 'slots',
+        bet: validateBetAmount(action.payload.bet, BOUNDS.MAX_BET),
+        result: typeof action.payload.result === 'string' ? action.payload.result.slice(0, 200) : '',
+        win: validateBalance(action.payload.win),
+        balanceAfter: validateBalance(action.payload.balanceAfter),
+        seed: typeof action.payload.seed === 'number' ? action.payload.seed : 0,
+      };
+      
       newState = {
         ...state,
         gameLogs: [
           {
-            ...action.payload,
+            ...validatedLog,
             id: crypto.randomUUID(),
             timestamp: new Date(),
           },
@@ -193,14 +281,30 @@ function casinoReducer(state: CasinoState, action: CasinoAction): CasinoState {
       break;
 
     case 'UPDATE_SETTINGS':
+      // Validate and sanitize all settings
+      const validatedSettings: Partial<CasinoSettings> = {};
+      
+      if (action.payload.defaultBalance !== undefined) {
+        validatedSettings.defaultBalance = validateDefaultBalance(action.payload.defaultBalance);
+      }
+      if (action.payload.slotRTP !== undefined) {
+        validatedSettings.slotRTP = validateSlotRTP(action.payload.slotRTP);
+      }
+      if (action.payload.diceHouseEdge !== undefined) {
+        validatedSettings.diceHouseEdge = validateDiceHouseEdge(action.payload.diceHouseEdge);
+      }
+      if (action.payload.rngSeed !== undefined) {
+        validatedSettings.rngSeed = validateRNGSeed(action.payload.rngSeed);
+      }
+      
       newState = {
         ...state,
-        settings: { ...state.settings, ...action.payload },
+        settings: { ...state.settings, ...validatedSettings },
       };
       // If RNG seed changed, update global RNG
-      if (action.payload.rngSeed !== undefined) {
-        if (action.payload.rngSeed !== null) {
-          rng.setSeed(action.payload.rngSeed);
+      if (validatedSettings.rngSeed !== undefined) {
+        if (validatedSettings.rngSeed !== null) {
+          rng.setSeed(validatedSettings.rngSeed);
         } else {
           rng.newSeed();
         }
@@ -211,7 +315,7 @@ function casinoReducer(state: CasinoState, action: CasinoAction): CasinoState {
       if (!state.user) return state;
       newState = {
         ...state,
-        user: { ...state.user, balance: state.settings.defaultBalance },
+        user: { ...state.user, balance: validateBalance(state.settings.defaultBalance) },
       };
       break;
 
@@ -247,20 +351,21 @@ function casinoReducer(state: CasinoState, action: CasinoAction): CasinoState {
       const lastClaim = state.dailyBonus.lastClaimDate;
       const isConsecutive = lastClaim === today || (lastClaim && new Date(lastClaim).toDateString() === new Date(Date.now() - 86400000).toDateString());
       
-      const newConsecutiveDays = isConsecutive ? state.dailyBonus.consecutiveDays + 1 : 1;
-      const bonusAmount = 100 + (newConsecutiveDays - 1) * 50; // Increasing bonus
+      const newConsecutiveDays = Math.min(365, isConsecutive ? state.dailyBonus.consecutiveDays + 1 : 1);
+      const bonusAmount = Math.min(1000000, 100 + (newConsecutiveDays - 1) * 50); // Increasing bonus with cap
       
       newState = {
         ...state,
         dailyBonus: {
           lastClaimDate: today,
           consecutiveDays: newConsecutiveDays,
-          nextBonusAmount: 100 + newConsecutiveDays * 50,
+          nextBonusAmount: Math.min(1000000, 100 + newConsecutiveDays * 50),
         },
       };
       
       if (state.user) {
-        newState.user = { ...state.user, balance: state.user.balance + bonusAmount };
+        const newBalance = state.user.balance + bonusAmount;
+        newState.user = { ...state.user, balance: Math.min(newBalance, BOUNDS.MAX_BALANCE) };
       }
       break;
 
@@ -279,7 +384,7 @@ function casinoReducer(state: CasinoState, action: CasinoAction): CasinoState {
   try {
     localStorage.setItem('casinoState', JSON.stringify(newState));
   } catch (e) {
-    console.error('Failed to save casino state:', e);
+    logger.error('Failed to save casino state:', e);
   }
 
   return newState;
@@ -326,14 +431,34 @@ export function CasinoProvider({ children }: { children: ReactNode }) {
   };
 
   const placeBet = (amount: number): boolean => {
-    if (!state.user || state.user.balance < amount) return false;
-    dispatch({ type: 'UPDATE_BALANCE', payload: state.user.balance - amount });
+    if (!state.user) return false;
+    
+    // Validate and sanitize bet amount
+    const validatedAmount = validateBetAmount(amount, state.user.balance);
+    
+    // Ensure user has sufficient balance
+    if (state.user.balance < validatedAmount) return false;
+    
+    // Ensure bet is within bounds
+    if (validatedAmount < BOUNDS.MIN_BET || validatedAmount > BOUNDS.MAX_BET) {
+      return false;
+    }
+    
+    dispatch({ type: 'UPDATE_BALANCE', payload: state.user.balance - validatedAmount });
     return true;
   };
 
   const addWinnings = (amount: number) => {
     if (!state.user) return;
-    dispatch({ type: 'UPDATE_BALANCE', payload: state.user.balance + amount });
+    
+    // Validate and sanitize winnings amount
+    const validatedAmount = Math.max(0, Math.min(BOUNDS.MAX_BALANCE, amount));
+    const newBalance = state.user.balance + validatedAmount;
+    
+    // Ensure balance doesn't exceed maximum
+    const finalBalance = Math.min(newBalance, BOUNDS.MAX_BALANCE);
+    
+    dispatch({ type: 'UPDATE_BALANCE', payload: finalBalance });
   };
 
   const logGame = (log: Omit<GameLog, 'id' | 'timestamp' | 'userId'>) => {

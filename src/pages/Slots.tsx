@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useCasino } from '@/context/CasinoContext';
 import { Layout } from '@/components/Layout';
 import { BetControls } from '@/components/BetControls';

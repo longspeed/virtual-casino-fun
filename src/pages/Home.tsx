@@ -43,7 +43,6 @@ export default function Home() {
   
   const balance = state.user?.balance || 0;
   const lossStreak = state.streaks.currentLossStreak;
-  const totalGames = state.stats.totalGames;
   
   useEffect(() => {
     // Loss aversion mechanics

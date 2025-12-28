@@ -133,7 +133,6 @@ export function spinSlots(rtp: number = 0.96): SlotSymbol[] {
  */
 export function calculateSlotWin(symbols: SlotSymbol[], bet: number): { multiplier: number; win: number } {
   const key3 = symbols.join('');
-  const key2 = symbols.slice(0, 2).join('');
   
   // Check for 3-symbol matches first
   if (SLOT_PAYTABLE[key3]) {
@@ -613,7 +612,7 @@ export function blackjackSplit(game: BlackjackGame): BlackjackGame {
 }
 
 /**
- * Move to next hand or dealer turn ngoc son gay qay
+ * Move to next hand or dealer turn
  */
 function moveToNextHand(game: BlackjackGame): BlackjackGame {
   const newGame = { ...game };

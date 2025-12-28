@@ -1,6 +1,5 @@
 import { useCasino } from '@/context/CasinoContext';
 import { Flame, TrendingDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export function StreakDisplay() {
   const { state } = useCasino();

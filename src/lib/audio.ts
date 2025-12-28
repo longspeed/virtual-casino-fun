@@ -44,7 +44,7 @@ class AudioManager {
     this.createSound('achievement', this.generateTone(880, 0.25, 'sine'));
   }
 
-  private generateTone(frequency: number, duration: number, type: OscillatorType): string {
+  private generateTone(_frequency: number, _duration: number, _type: OscillatorType): string {
     // Generate a data URL for a simple tone
     // In production, use actual audio files
     return `data:audio/wav;base64,`; // Placeholder

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { BetControls } from '@/components/BetControls';
 import { useCasino } from '@/context/CasinoContext';
@@ -231,7 +231,7 @@ export default function Blackjack() {
     // Log the game
 
     logGame({
-      game: 'blackjack' as any,
+      game: 'blackjack',
       bet: totalBetAmount,
       result: finalGame.results.map(r => r.outcome).join(', '),
       win: netWin > 0 ? netWin : 0,

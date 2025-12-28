@@ -4,7 +4,6 @@ import { useCasino } from '@/context/CasinoContext';
 import { Button } from '@/components/ui/button';
 import { Settings, LogOut } from 'lucide-react';
 import { StreakDisplay } from './StreakDisplay';
-import { DailyBonus } from './DailyBonus';
 
 interface LayoutProps {
   children: ReactNode;
